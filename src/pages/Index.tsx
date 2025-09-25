@@ -5,44 +5,70 @@ import BriefingForm from '@/components/BriefingForm';
 import BriefingResults from '@/components/BriefingResults';
 import Map from '@/components/Map';
 
+// Define the BriefingRequest type
+interface RoutePoint {
+  icao: string;
+  name: string;
+  lat: number;
+  lng: number;
+  type: 'departure' | 'waypoint' | 'destination';
+}
+
+interface BriefingRequest {
+  route: RoutePoint[];
+  routeString: string[];
+  totalDistance: number;
+  estimatedFlightTime: number;
+}
+
 type BriefingStatus = 'initial' | 'loading' | 'success' | 'error';
 
 const Index: React.FC = () => {
   const [briefingStatus, setBriefingStatus] = useState<BriefingStatus>('initial');
   const [briefingSummary, setBriefingSummary] = useState<string | null>(null);
   const [briefingError, setBriefingError] = useState<string | null>(null);
+  const [briefingData, setBriefingData] = useState<any>(null); // Add this missing state
   const [currentRoute, setCurrentRoute] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [currentInput, setCurrentInput] = useState<string>(''); // New state for current input
+  const [currentInput, setCurrentInput] = useState<string>('');
 
-  const handleGenerateBriefing = (route: string[]) => {
+  const handleGenerateBriefing = async (briefingData: BriefingRequest) => {
     setIsLoading(true);
     setBriefingStatus('loading');
-    setBriefingSummary(null);
     setBriefingError(null);
-    setCurrentRoute(route);
-
-    // Simulate API call
-    setTimeout(() => {
-      const isError = Math.random() < 0.3; // Simulate a 30% chance of error
-      if (isError) {
-        setBriefingStatus('error');
-        setBriefingError('Could not retrieve weather data for the specified route.');
-      } else {
-        setBriefingStatus('success');
-        setBriefingSummary(
-          `1. Scattered clouds at 3,000 ft along the route, with isolated broken layers at 5,000 ft near ${route[0]}.
-2. Moderate turbulence expected below 8,000 ft due to strong winds aloft, especially over mountainous terrain.
-3. Visibility generally good (10 SM), but localized haze reducing it to 5 SM near ${route[route.length - 1]} in the morning.
-4. No significant icing conditions forecast, but light rime icing possible in clouds above 10,000 ft.
-5. Winds: Strong westerly flow at 25-35 knots at 6,000 ft, becoming southwesterly near destination.`
-        );
+    
+    try {
+      console.log('📡 Sending briefing request to backend:', briefingData);
+      
+      const response = await fetch('http://localhost:5000/api/generate-briefing', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(briefingData)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
+      
+      const briefingResult = await response.json();
+      console.log('✅ Received briefing from backend:', briefingResult);
+      
+      // Update state with the received data
+      setBriefingData(briefingResult);
+      setBriefingStatus('success');
+      setBriefingSummary(JSON.stringify(briefingResult, null, 2)); // Simple display of the data
+      
+    } catch (error) {
+      console.error('❌ Error generating briefing:', error);
+      setBriefingStatus('error');
+      setBriefingError(error instanceof Error ? error.message : 'Unknown error occurred');
+    } finally {
       setIsLoading(false);
-    }, 2000); // Simulate a 2-second network request
+    }
   };
 
-  // New handler for route and input changes
   const handleRouteChange = (route: string[], inputValue: string) => {
     setCurrentRoute(route);
     setCurrentInput(inputValue);

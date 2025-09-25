@@ -1,15 +1,36 @@
 import requests
 
-# Fixed URL (removed extra spaces)
-URL = "https://aviationweather.gov/api/data/metar"
+def get_metar_data(airport_id, format_type="raw"):
+    """
+    Fetch METAR data for a given airport ID.
+    
+    Args:
+        airport_id (str): The airport ICAO code (e.g., "VABB", "KJFK")
+        format_type (str): The format of the data ("raw" or "json")
+    
+    Returns:
+        str: The METAR data in the specified format
+    """
+    URL = "https://aviationweather.gov/api/data/metar"
+    
+    PARAMS = {
+        "ids": airport_id,
+        "format": format_type
+    }
+    
+    try:
+        r = requests.get(url=URL, params=PARAMS)
+        r.raise_for_status()  # Raises an HTTPError for bad responses
+        return r.text
+    except requests.exceptions.RequestException as e:
+        return f"Error fetching data: {e}"
 
-# Corrected parameters - using "id" instead of "ids"
-PARAMS = {
-    "ids": "VABB",       # Changed from "ids" to "id"
-    # "distance": 200,     # Increased to 50 miles (5 miles is too small)
-    "format": "raw"
-}
-
-r = requests.get(url=URL, params=PARAMS)
-data = r.text
-print(data)
+# Example usage
+if __name__ == "__main__":
+    # Test with different airport codes
+    metar_data = get_metar_data("VABB")
+    print(metar_data)
+    
+    # You can also call it with other airports
+    # metar_data = get_metar_data("KJFK")
+    # print(metar_data)

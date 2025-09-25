@@ -15,27 +15,58 @@ def expand_cloud_quantity(quantity):
     key = str(quantity).split('.')[-1]
     return CLOUD_COVERAGE_FULL.get(key, key)
 
+def parse_metar_string(metar_string):
+    """
+    Parse a METAR string and return the formatted output.
+    
+    Args:
+        metar_string (str): The METAR string to parse (e.g., "METAR KBUR 252053Z 19008KT 10SM CLR 27/16 A2995")
+    
+    Returns:
+        str: Formatted weather report
+    """
+    parser = MetarParser()
+    try:
+        # Clean the METAR string - remove "METAR" prefix if present and any trailing characters
+        clean_metar = metar_string.strip()
+        if clean_metar.startswith("METAR "):
+            clean_metar = clean_metar[6:]  # Remove "METAR " prefix
+        if clean_metar.endswith(" $"):
+            clean_metar = clean_metar[:-2]  # Remove trailing " $"
+        
+        metar = parser.parse(clean_metar)
+        return format_metar_plaintext(metar)
+    except Exception as e:
+        return f"Error parsing METAR: {e}"
+
 def main():
     if len(sys.argv) != 2:
         print("Usage: python parse_metar_cli.py \"<METAR string>\"")
         sys.exit(1)
 
     metar_string = sys.argv[1]
-    parser = MetarParser()
-    try:
-        metar = parser.parse(metar_string)
-        print_metar_plaintext(metar)
-    except Exception as e:
-        print(f"Error parsing METAR: {e}")
+    result = parse_metar_string(metar_string)
+    print(result)
 
-def print_metar_plaintext(metar):
+def format_metar_plaintext(metar):
+    """
+    Format METAR data into a readable string format.
+    
+    Args:
+        metar: Parsed METAR object
+    
+    Returns:
+        str: Formatted weather report
+    """
+    output_lines = []
+    
     # Station and time
     station = getattr(metar, 'station', 'Unknown')
     day = getattr(metar, 'day', 'Unknown')
     time = getattr(metar, 'time', None)
     time_str = time.strftime("%H:%M:%S") if time else "Unknown time"
 
-    print(f"Weather report for {station} on day {day} at {time_str} UTC:")
+    output_lines.append(f"Weather report for {station} on day {day} at {time_str} UTC:")
 
     # Wind
     wind = getattr(metar, 'wind', None)
@@ -48,9 +79,9 @@ def print_metar_plaintext(metar):
             wind_desc = f"Wind from {direction}° at {speed} knots"
             if gust:
                 wind_desc += f", gusting to {gust} knots"
-        print(wind_desc)
+        output_lines.append(wind_desc)
     else:
-        print("Wind data not available")
+        output_lines.append("Wind data not available")
 
     # Visibility
     visibility = getattr(metar, 'visibility', None)
@@ -60,11 +91,11 @@ def print_metar_plaintext(metar):
             dist_str = str(dist)
             if 'SM' in dist_str:
                 dist_str = dist_str.replace('SM', ' Statute Miles')
-            print(f"Visibility: {dist_str}")
+            output_lines.append(f"Visibility: {dist_str}")
         else:
-            print("Visibility data not available")
+            output_lines.append("Visibility data not available")
     else:
-        print("Visibility data not available")
+        output_lines.append("Visibility data not available")
 
     # Clouds
     clouds = getattr(metar, 'clouds', None)
@@ -76,9 +107,9 @@ def print_metar_plaintext(metar):
             quantity_full = expand_cloud_quantity(quantity)
             height_str = f"{height*100 if height else 'Unknown'} feet"
             cloud_descs.append(f"{quantity_full} at {height_str}")
-        print("Clouds: " + ", ".join(cloud_descs))
+        output_lines.append("Clouds: " + ", ".join(cloud_descs))
     else:
-        print("Cloud data not available")
+        output_lines.append("Cloud data not available")
 
     # Weather conditions
     weather_conditions = getattr(metar, 'weather_conditions', None)
@@ -100,26 +131,28 @@ def print_metar_plaintext(metar):
             if desc:
                 weather_descs.append(desc)
         if weather_descs:
-            print("Weather: " + ", ".join(weather_descs))
+            output_lines.append("Weather: " + ", ".join(weather_descs))
         else:
-            print("Weather conditions not available")
+            output_lines.append("Weather conditions not available")
     else:
-        print("Weather conditions not available")
+        output_lines.append("Weather conditions not available")
 
     # Temperature and dew point
     temp = getattr(metar, 'temperature', None)
     dew_point = getattr(metar, 'dew_point', None) or getattr(metar, 'dew_point', None)
     if temp is not None and dew_point is not None:
-        print(f"Temperature: {temp}°C, Dew Point: {dew_point}°C")
+        output_lines.append(f"Temperature: {temp}°C, Dew Point: {dew_point}°C")
     else:
-        print("Temperature and dew point data not available")
+        output_lines.append("Temperature and dew point data not available")
 
     # Pressure (altimeter)
     altimeter = getattr(metar, 'altimeter', None)
     if altimeter:
-        print(f"Pressure (altimeter): {altimeter} hPa")
+        output_lines.append(f"Pressure (altimeter): {altimeter} hPa")
     else:
-        print("Pressure data not available")
+        output_lines.append("Pressure data not available")
+    
+    return "\n".join(output_lines)
 
 if __name__ == "__main__":
     main()

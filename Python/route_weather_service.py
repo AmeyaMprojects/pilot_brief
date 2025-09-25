@@ -12,6 +12,16 @@ except ImportError:
     def get_metar_data(airport_id, format_type="raw"):
         return f"Error: Could not fetch METAR for {airport_id}"
 
+# Import the METAR parsing function
+try:
+    from metar_parse import parse_metar_string
+    print("✅ Successfully imported METAR parser")
+except ImportError:
+    print("❌ Could not import parse_metar_string from metar_parse")
+    # Define a fallback function
+    def parse_metar_string(metar_string):
+        return f"Error: Could not parse METAR - parser not available"
+
 app = Flask(__name__)
 CORS(app)
 
@@ -143,10 +153,20 @@ def get_weather_for_route(icao_codes):
     for icao_code in icao_codes:
         print(f"🌤️ Fetching weather for {icao_code}...")
         try:
-            metar_data = get_metar_data(icao_code)
+            raw_metar_data = get_metar_data(icao_code)
+            
+            # Parse the raw METAR data
+            parsed_metar_data = None
+            try:
+                parsed_metar_data = parse_metar_string(raw_metar_data)
+                print(f"   ✅ Success: {icao_code} (parsed)")
+            except Exception as parse_error:
+                print(f"   ⚠️ Warning: {icao_code} - Could not parse METAR: {str(parse_error)}")
+            
             weather_data[icao_code] = {
                 'status': 'success',
-                'metar': metar_data.strip(),
+                'metar': raw_metar_data.strip(),
+                'parsed_metar': parsed_metar_data,
                 'fetched_at': datetime.now().isoformat()
             }
             print(f"   ✅ Success: {icao_code}")
@@ -155,6 +175,7 @@ def get_weather_for_route(icao_codes):
                 'status': 'error',
                 'error': str(e),
                 'metar': None,
+                'parsed_metar': None,
                 'fetched_at': datetime.now().isoformat()
             }
             print(f"   ❌ Error: {icao_code} - {str(e)}")

@@ -3,7 +3,6 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import BriefingForm from '@/components/BriefingForm';
 import BriefingResults from '@/components/BriefingResults';
-import { MadeWithDyad } from "@/components/made-with-dyad"; // Keep this for attribution
 
 type BriefingStatus = 'initial' | 'loading' | 'success' | 'error';
 
@@ -52,12 +51,8 @@ const Index: React.FC = () => {
           errorMessage={briefingError}
           route={currentRoute}
         />
-        <p className="text-muted-foreground text-sm mt-8 text-center">
-          Note: The "Generate Briefing" button currently simulates a backend call and provides dummy data.
-          Actual backend integration with aviationweather.gov and an AI model would be required for real functionality.
-        </p>
+      
       </main>
-      <MadeWithDyad />
       <Footer />
     </div>
   );

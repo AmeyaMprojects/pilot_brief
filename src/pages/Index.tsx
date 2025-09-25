@@ -30,6 +30,7 @@ const Index: React.FC = () => {
   const [briefingData, setBriefingData] = useState<any>(null);
   const [currentRoute, setCurrentRoute] = useState<string[]>([]);
   const [routePoints, setRoutePoints] = useState<RoutePoint[]>([]); // Add this state
+  const [icaoOrder, setIcaoOrder] = useState<string[]>([]); // Add this state for preserving order
   const [isLoading, setIsLoading] = useState(false);
   const [currentInput, setCurrentInput] = useState<string>('');
 
@@ -102,6 +103,7 @@ const Index: React.FC = () => {
         
         setBriefingSummary(weatherSummary);
         setBriefingData(data);
+        setIcaoOrder(icaoCodes); // Store the order of ICAO codes
         setBriefingStatus('success');
       } else {
         setBriefingError(data.error || 'Failed to generate briefing');
@@ -148,7 +150,8 @@ const Index: React.FC = () => {
             summary={briefingSummary}
             errorMessage={briefingError}
             route={currentRoute}
-            weatherData={briefingData?.weather_data} // Add this line
+            weatherData={briefingData?.weather_data}
+            icaoOrder={icaoOrder} // Pass the order of ICAO codes
           />
         </div>
       </main>

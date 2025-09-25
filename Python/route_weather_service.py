@@ -157,11 +157,12 @@ def get_weather_for_route(icao_codes):
             
             # Parse the raw METAR data
             parsed_metar_data = None
+            parse_status = ""
             try:
                 parsed_metar_data = parse_metar_string(raw_metar_data)
-                print(f"   ✅ Success: {icao_code} (parsed)")
+                parse_status = " (parsed)"
             except Exception as parse_error:
-                print(f"   ⚠️ Warning: {icao_code} - Could not parse METAR: {str(parse_error)}")
+                parse_status = f" (parse error: {str(parse_error)})"
             
             weather_data[icao_code] = {
                 'status': 'success',
@@ -169,7 +170,7 @@ def get_weather_for_route(icao_codes):
                 'parsed_metar': parsed_metar_data,
                 'fetched_at': datetime.now().isoformat()
             }
-            print(f"   ✅ Success: {icao_code}")
+            print(f"   ✅ Success: {icao_code}{parse_status}")
         except Exception as e:
             weather_data[icao_code] = {
                 'status': 'error',

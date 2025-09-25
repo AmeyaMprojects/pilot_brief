@@ -6,9 +6,7 @@ const Footer: React.FC = () => {
       <div className="mb-2 md:mb-0">
         © 2025 Name placeholder
       </div>
-      <div className="text-center md:text-right">
-        For informational purposes only. Not for official flight planning.
-      </div>
+     
     </footer>
   );
 };

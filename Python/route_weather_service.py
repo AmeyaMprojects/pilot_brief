@@ -3,6 +3,14 @@ from flask_cors import CORS
 import json
 import math
 from datetime import datetime
+# Import the get_metar_data function from aviation_api
+try:
+    from aviation_api import get_metar_data
+except ImportError:
+    print("❌ Could not import get_metar_data from aviation_api")
+    # Define a fallback function for now
+    def get_metar_data(airport_id, format_type="raw"):
+        return f"Error: Could not fetch METAR for {airport_id}"
 
 app = Flask(__name__)
 CORS(app)
@@ -119,6 +127,39 @@ AIRPORT_DATABASE = {
     'KTYS': {'name': 'TYS Airport', 'lat': 35.8111, 'lng': -83.9940},
     'KXNA': {'name': 'XNA Airport', 'lat': 36.2818, 'lng': -94.3069}
 }
+
+def get_weather_for_route(icao_codes):
+    """
+    Get METAR data for all airports in the route
+    
+    Args:
+        icao_codes (list): List of ICAO airport codes
+    
+    Returns:
+        dict: Weather data for all airports
+    """
+    weather_data = {}
+    
+    for icao_code in icao_codes:
+        print(f"🌤️ Fetching weather for {icao_code}...")
+        try:
+            metar_data = get_metar_data(icao_code)
+            weather_data[icao_code] = {
+                'status': 'success',
+                'metar': metar_data.strip(),
+                'fetched_at': datetime.now().isoformat()
+            }
+            print(f"   ✅ Success: {icao_code}")
+        except Exception as e:
+            weather_data[icao_code] = {
+                'status': 'error',
+                'error': str(e),
+                'metar': None,
+                'fetched_at': datetime.now().isoformat()
+            }
+            print(f"   ❌ Error: {icao_code} - {str(e)}")
+    
+    return weather_data
 
 def calculate_great_circle_distance(lat1, lon1, lat2, lon2):
     """Calculate great circle distance between two points in nautical miles"""
@@ -260,17 +301,66 @@ def generate_complete_route_with_intermediates(route_points):
     
     return complete_route
 
+def convert_icao_to_route_points(icao_codes):
+    """Convert ICAO codes to RoutePoint objects using the airport database"""
+    route_points = []
+    
+    for i, icao in enumerate(icao_codes):
+        if icao in AIRPORT_DATABASE:
+            airport = AIRPORT_DATABASE[icao]
+            route_point = {
+                'icao': icao,
+                'name': airport.get('name', icao),
+                'lat': airport['lat'],
+                'lng': airport['lng'],
+                'type': 'departure' if i == 0 else ('destination' if i == len(icao_codes) - 1 else 'waypoint')
+            }
+            route_points.append(route_point)
+            print(f"   ✅ Found {icao}: {airport['lat']:.4f}, {airport['lng']:.4f}")
+        else:
+            print(f"   ❌ Airport {icao} not found in database")
+            # You might want to handle this case - skip or use default coordinates
+            
+    return route_points
+
 @app.route('/api/generate-briefing', methods=['POST'])
 def receive_route_coordinates():
     """API endpoint to receive route coordinates and find intermediate airports within 50 NM"""
     try:
         briefing_request = request.get_json()
         
-        if not briefing_request or 'route' not in briefing_request:
-            return jsonify({'error': 'Invalid request - route data required'}), 400
+        if not briefing_request:
+            return jsonify({'error': 'Invalid request - no data provided'}), 400
         
-        route_points = briefing_request.get('route', [])
-        route_string = briefing_request.get('routeString', [])
+        # Handle both formats: RoutePoint objects or simple ICAO string array
+        if 'route' in briefing_request and isinstance(briefing_request['route'], list):
+            # Check if we have RoutePoint objects with valid coordinates
+            route_points = briefing_request['route']
+            
+            # Check if all route points have zero coordinates (from frontend conversion)
+            has_valid_coords = any(point.get('lat', 0) != 0 or point.get('lng', 0) != 0 for point in route_points)
+            
+            if not has_valid_coords:
+                # Extract ICAO codes and look them up in our database
+                icao_codes = [point.get('icao', '') for point in route_points if point.get('icao')]
+                print(f"🔍 Converting ICAO codes to coordinates: {icao_codes}")
+                route_points = convert_icao_to_route_points(icao_codes)
+                
+                if not route_points:
+                    return jsonify({'error': 'No valid airports found in database'}), 400
+                    
+        elif 'routeString' in briefing_request:
+            # Handle simple ICAO string array
+            icao_codes = briefing_request['routeString']
+            print(f"🔍 Converting ICAO string array to coordinates: {icao_codes}")
+            route_points = convert_icao_to_route_points(icao_codes)
+            
+            if not route_points:
+                return jsonify({'error': 'No valid airports found in database'}), 400
+        else:
+            return jsonify({'error': 'Invalid request - route or routeString required'}), 400
+        
+        route_string = briefing_request.get('routeString', [point['icao'] for point in route_points])
         total_distance = briefing_request.get('totalDistance', 0)
         estimated_flight_time = briefing_request.get('estimatedFlightTime', 0)
         
@@ -289,10 +379,20 @@ def receive_route_coordinates():
         original_airports = [p for p in complete_route if p['type'] != 'intermediate']
         intermediate_airports = [p for p in complete_route if p['type'] == 'intermediate']
         
+        # Extract only ICAO codes for weather briefing
+        original_icao_codes = [airport['icao'] for airport in original_airports]
+        intermediate_icao_codes = [airport['icao'] for airport in intermediate_airports]
+        all_icao_codes_within_50nm = original_icao_codes + intermediate_icao_codes
+        
         print(f"\n✅ Complete Route Analysis (50 NM Filter):")
         print(f"   Original airports: {len(original_airports)}")
         print(f"   Intermediate airports within 50 NM: {len(intermediate_airports)}")
         print(f"   Total airports in extended route: {len(complete_route)}")
+        print(f"   ICAO codes for weather briefing: {', '.join(all_icao_codes_within_50nm)}")
+        
+        # Get weather data for all airports
+        print(f"\n🌤️ Fetching weather data for {len(all_icao_codes_within_50nm)} airports...")
+        weather_data = get_weather_for_route(all_icao_codes_within_50nm)
         
         # Calculate new total distance including intermediates
         total_extended_distance = 0
@@ -306,6 +406,13 @@ def receive_route_coordinates():
         response_data = {
             'status': 'success',
             'message': 'Route coordinates received and analyzed successfully (50 NM filter applied)',
+            'weather_briefing_airports': {
+                'icao_codes': all_icao_codes_within_50nm,
+                'original_route_icao': original_icao_codes,
+                'intermediate_icao_within_50nm': intermediate_icao_codes,
+                'total_count': len(all_icao_codes_within_50nm)
+            },
+            'weather_data': weather_data,  # Add weather data to response
             'filter_criteria': {
                 'max_distance_from_path_nm': 50,
                 'tolerance_percentage': 15
@@ -330,6 +437,14 @@ def receive_route_coordinates():
                 'min_distance_from_path': min([a['distance_from_path'] for a in intermediate_airports]) if intermediate_airports else 0,
                 'average_distance_between_points': round(total_extended_distance / (len(complete_route) - 1), 2) if len(complete_route) > 1 else 0,
                 'route_segments': len(complete_route) - 1
+            },
+            'weather_summary': {
+                'total_airports_queried': len(all_icao_codes_within_50nm),
+                'successful_weather_fetches': len([w for w in weather_data.values() if w['status'] == 'success']),
+                'failed_weather_fetches': len([w for w in weather_data.values() if w['status'] == 'error']),
+                'weather_fetch_success_rate': round(
+                    len([w for w in weather_data.values() if w['status'] == 'success']) / len(weather_data) * 100, 1
+                ) if weather_data else 0
             },
             'received_at': datetime.now().isoformat()
         }

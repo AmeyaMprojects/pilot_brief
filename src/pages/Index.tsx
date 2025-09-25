@@ -1,17 +1,64 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import React, { useState } from 'react';
+import Header from '@/components/Header';
+import Footer from '@/components/Footer';
+import BriefingForm from '@/components/BriefingForm';
+import BriefingResults from '@/components/BriefingResults';
+import { MadeWithDyad } from "@/components/made-with-dyad"; // Keep this for attribution
 
-import { MadeWithDyad } from "@/components/made-with-dyad";
+type BriefingStatus = 'initial' | 'loading' | 'success' | 'error';
 
-const Index = () => {
+const Index: React.FC = () => {
+  const [briefingStatus, setBriefingStatus] = useState<BriefingStatus>('initial');
+  const [briefingSummary, setBriefingSummary] = useState<string | null>(null);
+  const [briefingError, setBriefingError] = useState<string | null>(null);
+  const [currentRoute, setCurrentRoute] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleGenerateBriefing = (route: string[]) => {
+    setIsLoading(true);
+    setBriefingStatus('loading');
+    setBriefingSummary(null);
+    setBriefingError(null);
+    setCurrentRoute(route);
+
+    // Simulate API call
+    setTimeout(() => {
+      const isError = Math.random() < 0.3; // Simulate a 30% chance of error
+      if (isError) {
+        setBriefingStatus('error');
+        setBriefingError('Could not retrieve weather data for the specified route.');
+      } else {
+        setBriefingStatus('success');
+        setBriefingSummary(
+          `1. Scattered clouds at 3,000 ft along the route, with isolated broken layers at 5,000 ft near ${route[0]}.
+2. Moderate turbulence expected below 8,000 ft due to strong winds aloft, especially over mountainous terrain.
+3. Visibility generally good (10 SM), but localized haze reducing it to 5 SM near ${route[route.length - 1]} in the morning.
+4. No significant icing conditions forecast, but light rime icing possible in clouds above 10,000 ft.
+5. Winds: Strong westerly flow at 25-35 knots at 6,000 ft, becoming southwesterly near destination.`
+        );
+      }
+      setIsLoading(false);
+    }, 2000); // Simulate a 2-second network request
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-gray-600">
-          Start building your amazing project here!
+    <div className="min-h-screen flex flex-col bg-background text-foreground">
+      <Header />
+      <main className="flex-grow container mx-auto p-4 md:p-8 flex flex-col items-center justify-center">
+        <BriefingForm onGenerateBriefing={handleGenerateBriefing} isLoading={isLoading} />
+        <BriefingResults
+          status={briefingStatus}
+          summary={briefingSummary}
+          errorMessage={briefingError}
+          route={currentRoute}
+        />
+        <p className="text-muted-foreground text-sm mt-8 text-center">
+          Note: The "Generate Briefing" button currently simulates a backend call and provides dummy data.
+          Actual backend integration with aviationweather.gov and an AI model would be required for real functionality.
         </p>
-      </div>
+      </main>
       <MadeWithDyad />
+      <Footer />
     </div>
   );
 };

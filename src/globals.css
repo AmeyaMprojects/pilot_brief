@@ -64,3 +64,12 @@
     @apply text-white; /* Pure white for headers */
   }
 }
+
+/* Add this to your src/index.css or main CSS file */
+@import 'leaflet/dist/leaflet.css';
+
+/* Ensure the map container has proper dimensions */
+.leaflet-container {
+  height: 100%;
+  width: 100%;
+}

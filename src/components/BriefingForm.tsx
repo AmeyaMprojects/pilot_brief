@@ -22,11 +22,12 @@ const Loader2: FC<{ className?: string }> = ({ className }) => <svg className={c
 // --- Type Definition for the component's props ---
 interface BriefingFormProps {
   onGenerateBriefing: (route: string[]) => void;
+  onRouteChange?: (route: string[], inputValue: string) => void; // New prop
   isLoading: boolean;
 }
 
 // --- The Main Briefing Form Component ---
-const BriefingForm: FC<BriefingFormProps> = ({ onGenerateBriefing, isLoading }) => {
+const BriefingForm: FC<BriefingFormProps> = ({ onGenerateBriefing, onRouteChange, isLoading }) => {
   const [route, setRoute] = useState<string[]>([]);
   const [inputValue, setInputValue] = useState<string>('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -34,6 +35,13 @@ const BriefingForm: FC<BriefingFormProps> = ({ onGenerateBriefing, isLoading }) 
   
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Effect to notify parent of route/input changes
+  useEffect(() => {
+    if (onRouteChange) {
+      onRouteChange(route, inputValue);
+    }
+  }, [route, inputValue, onRouteChange]);
 
   // Effect to close suggestions when clicking outside
   useEffect(() => {
@@ -64,12 +72,18 @@ const BriefingForm: FC<BriefingFormProps> = ({ onGenerateBriefing, isLoading }) 
   
   const addIcaoToRoute = (icao: string) => {
     if (icao && !route.includes(icao)) {
-      setRoute([...route, icao]);
+      const newRoute = [...route, icao];
+      setRoute(newRoute);
       setInputValue('');
       setSuggestions([]);
       setSelectedSuggestionIndex(-1);
       inputRef.current?.focus();
     }
+  };
+
+  const removeIcao = (indexToRemove: number) => {
+    const newRoute = route.filter((_, index) => index !== indexToRemove);
+    setRoute(newRoute);
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -95,12 +109,9 @@ const BriefingForm: FC<BriefingFormProps> = ({ onGenerateBriefing, isLoading }) 
       setSuggestions([]);
       setSelectedSuggestionIndex(-1);
     } else if (e.key === 'Backspace' && !inputValue && route.length > 0) {
-      setRoute(route.slice(0, -1));
+      const newRoute = route.slice(0, -1);
+      setRoute(newRoute);
     }
-  };
-
-  const removeIcao = (indexToRemove: number) => {
-    setRoute(route.filter((_, index) => index !== indexToRemove));
   };
 
   const handleSubmit = (e: FormEvent) => {

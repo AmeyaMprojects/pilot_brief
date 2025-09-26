@@ -27,15 +27,35 @@ def parse_metar_string(metar_string):
     """
     parser = MetarParser()
     try:
-        # Clean the METAR string - remove "METAR" prefix if present and any trailing characters
+        # Clean the METAR string - remove "METAR" or "SPECI" prefix if present and any trailing characters
         clean_metar = metar_string.strip()
         if clean_metar.startswith("METAR "):
             clean_metar = clean_metar[6:]  # Remove "METAR " prefix
+        elif clean_metar.startswith("SPECI "):
+            clean_metar = clean_metar[6:]  # Remove "SPECI " prefix
         if clean_metar.endswith(" $"):
             clean_metar = clean_metar[:-2]  # Remove trailing " $"
         
+        # Additional validation - check if METAR string looks valid
+        if not clean_metar or len(clean_metar) < 10:
+            return f"Error parsing METAR: Invalid or too short METAR string: '{clean_metar}'"
+        
+        # Check if it starts with a valid ICAO code (4 characters, usually starting with K for US)
+        parts = clean_metar.split()
+        if len(parts) < 2:
+            return f"Error parsing METAR: Malformed METAR string: '{clean_metar}'"
+        
+        icao_code = parts[0]
+        if len(icao_code) != 4 or not icao_code.isalpha():
+            return f"Error parsing METAR: Invalid ICAO code '{icao_code}' in METAR: '{clean_metar}'"
+        
         metar = parser.parse(clean_metar)
         return format_metar_plaintext(metar)
+    except ValueError as e:
+        if "invalid literal for int()" in str(e):
+            return f"Error parsing METAR: Malformed numeric data in METAR string. Raw METAR: '{metar_string}'"
+        else:
+            return f"Error parsing METAR: {e}"
     except Exception as e:
         return f"Error parsing METAR: {e}"
 
@@ -71,15 +91,30 @@ def format_metar_plaintext(metar):
     # Wind
     wind = getattr(metar, 'wind', None)
     if wind:
-        direction = getattr(wind, 'degrees', None)
-        speed = getattr(wind, 'speed', None)
-        gust = getattr(wind, 'gust', None)
-        wind_desc = "Wind data not available"
-        if direction is not None and speed is not None:
-            wind_desc = f"Wind from {direction}° at {speed} knots"
-            if gust:
-                wind_desc += f", gusting to {gust} knots"
-        output_lines.append(wind_desc)
+        try:
+            direction = getattr(wind, 'degrees', None)
+            speed = getattr(wind, 'speed', None)
+            gust = getattr(wind, 'gust', None)
+            wind_desc = "Wind data not available"
+            
+            if direction is not None and speed is not None:
+                # Safely convert to numbers
+                try:
+                    dir_num = int(direction) if isinstance(direction, (int, float, str)) else direction
+                    speed_num = int(speed) if isinstance(speed, (int, float, str)) else speed
+                    wind_desc = f"Wind from {dir_num}° at {speed_num} knots"
+                    
+                    if gust:
+                        gust_num = int(gust) if isinstance(gust, (int, float, str)) else gust
+                        wind_desc += f", gusting to {gust_num} knots"
+                except (ValueError, TypeError):
+                    wind_desc = f"Wind from {direction}° at {speed} knots (raw data)"
+                    if gust:
+                        wind_desc += f", gusting to {gust} knots"
+            
+            output_lines.append(wind_desc)
+        except Exception as e:
+            output_lines.append("Wind data parsing error")
     else:
         output_lines.append("Wind data not available")
 
@@ -102,12 +137,35 @@ def format_metar_plaintext(metar):
     if clouds:
         cloud_descs = []
         for c in clouds:
-            quantity = getattr(c, 'quantity', None)
-            height = getattr(c, 'height', None)
-            quantity_full = expand_cloud_quantity(quantity)
-            height_str = f"{height*100 if height else 'Unknown'} feet"
-            cloud_descs.append(f"{quantity_full} at {height_str}")
-        output_lines.append("Clouds: " + ", ".join(cloud_descs))
+            try:
+                quantity = getattr(c, 'quantity', None)
+                height = getattr(c, 'height', None)
+                quantity_full = expand_cloud_quantity(quantity)
+                
+                # Safely handle height conversion
+                if height is not None:
+                    try:
+                        if isinstance(height, (int, float)):
+                            height_str = f"{int(height*100)} feet"
+                        else:
+                            # Try to convert string to number
+                            height_num = float(str(height))
+                            height_str = f"{int(height_num*100)} feet"
+                    except (ValueError, TypeError):
+                        height_str = "Unknown height"
+                else:
+                    height_str = "Unknown height"
+                
+                cloud_descs.append(f"{quantity_full} at {height_str}")
+            except Exception as e:
+                # Skip malformed cloud data but continue processing
+                print(f"Warning: Skipping malformed cloud data: {e}", file=sys.stderr)
+                continue
+        
+        if cloud_descs:
+            output_lines.append("Clouds: " + ", ".join(cloud_descs))
+        else:
+            output_lines.append("Cloud data not available")
     else:
         output_lines.append("Cloud data not available")
 

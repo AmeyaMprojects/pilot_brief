@@ -234,7 +234,7 @@ def calculate_distance_from_line(point_lat, point_lng, line_start_lat, line_star
         # Cross-track distance
         cross_track_distance = abs(math.asin(math.sin(d13 / 3440.065) * math.sin(bearing13 - bearing12)) * 3440.065)
         
-        return cross_track_distance
+        return cross_track_distance 
     except:
         # Fallback: return minimum distance to either endpoint
         return min(d13, d23)
@@ -483,9 +483,9 @@ def health_check():
     return jsonify({'status': 'healthy', 'service': 'Route Analysis Service (50 NM Filter)'})
 
 if __name__ == '__main__':
-    print("🚀 Starting Route Analysis Service...")
-    print("📡 API available at: http://localhost:5000")
-    print("🔗 Health check: http://localhost:5000/api/health")
-    print("📍 Route endpoint: POST http://localhost:5000/api/generate-briefing")
-    print("✈️ Will find airports within 50 NM of flight path")
+    print(" Starting Route Analysis Service...")
+    print(" API available at: http://localhost:5000")
+    print("Health check: http://localhost:5000/api/health")
+    print(" Route endpoint: POST http://localhost:5000/api/generate-briefing")
+    print(" Will find airports within 50 NM of flight path")
     app.run(debug=True, host='0.0.0.0', port=5000)

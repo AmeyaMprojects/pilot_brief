@@ -384,7 +384,7 @@ const BriefingForm: FC<BriefingFormProps> = ({ onGenerateBriefing, onRouteChange
                     }))))} NM
                   </span>
                 </div>
-                <div>
+                {/* <div>
                   <span className="text-gray-400">Est. Time:</span>
                   <span className="ml-2 text-white font-mono">
                     {Math.round(calculateTotalDistance(route.map((icao, index) => ({
@@ -395,7 +395,7 @@ const BriefingForm: FC<BriefingFormProps> = ({ onGenerateBriefing, onRouteChange
                       type: index === 0 ? 'departure' : index === route.length - 1 ? 'destination' : 'waypoint'
                     }))) / 120 * 60)} min
                   </span>
-                </div>
+                </div> */}
               </div>
             </div>
           )}

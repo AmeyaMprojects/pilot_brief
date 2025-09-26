@@ -7,13 +7,23 @@ interface WeatherData {
 }
 
 interface GeminiResponse {
-  candidates: Array<{
-    content: {
-      parts: Array<{
-        text: string;
+  candidates?: Array<{
+    content?: {
+      parts?: Array<{
+        text?: string;
       }>;
+      text?: string; // Alternative format
+      role?: string;
     };
+    text?: string; // Direct text on candidate
+    message?: string; // Alternative message format
+    finishReason?: string;
   }>;
+  error?: {
+    code: number;
+    message: string;
+    status?: string;
+  };
 }
 
 // Request deduplication cache
@@ -44,6 +54,94 @@ async function listAvailableModels(apiKey: string) {
   }
 }
 
+// Shorter version for when we hit token limits
+async function generateFlightPathSummaryShort(
+  weatherData: { [icao: string]: WeatherData },
+  icaoOrder: string[],
+  route: string[]
+): Promise<string> {
+  try {
+    const requestKey = JSON.stringify({ icaoOrder, route: route.slice(0, 2), short: true });
+    
+    // Get only key airports (departure, destination, and a few waypoints)
+    const keyAirports = [route[0], route[route.length - 1]];
+    if (icaoOrder.length > 2) {
+      // Add middle airports if available
+      const middle = Math.floor(icaoOrder.length / 2);
+      keyAirports.splice(1, 0, icaoOrder[middle]);
+    }
+    
+    const weatherSummary = keyAirports.map(icao => {
+      const weather = weatherData[icao];
+      if (weather && weather.status === 'success') {
+        // Extract only essential info
+        const metar = weather.metar || '';
+        const windMatch = metar.match(/(\d{3})(\d{2,3})KT/);
+        const visMatch = metar.match(/(\d+)SM/);
+        const tempMatch = metar.match(/(\d{2})\/(\d{2})/);
+        
+        let summary = `${icao}: `;
+        if (windMatch) summary += `Wind ${windMatch[1]}°/${windMatch[2]}kt `;
+        if (visMatch) summary += `Vis ${visMatch[1]}SM `;
+        if (tempMatch) summary += `Temp ${parseInt(tempMatch[1])}°C`;
+        
+        return summary;
+      }
+      return `${icao}: No data`;
+    }).join('\n');
+
+    const shortPrompt = `Route: ${route[0]} to ${route[route.length - 1]}
+${weatherSummary}
+
+5 lines max:
+1. ⚠️ HAZARDS: Any dangerous conditions (winds >20kt, low vis, etc.) or "None"
+2. 🌤️ CONDITIONS: Overall weather
+3. 💨 WINDS: Wind summary
+4. 👁️ VISIBILITY: Vis restrictions or "Good"
+5. 📋 PILOT NOTE: Key recommendation`;
+
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) {
+      return generateBasicSummary(weatherData, icaoOrder, route, false);
+    }
+
+    const requestBody = {
+      contents: [{ parts: [{ text: shortPrompt }] }],
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 512, // Much smaller limit for short response
+      }
+    };
+
+    console.log('🚀 Short prompt request:', JSON.stringify(requestBody, null, 2));
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('🔍 Short response:', JSON.stringify(data, null, 2));
+
+    if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
+      return data.candidates[0].content.parts[0].text;
+    }
+
+    throw new Error('No valid response from short prompt');
+  } catch (error) {
+    console.error('Short prompt also failed:', error);
+    return generateBasicSummary(weatherData, icaoOrder, route, false);
+  }
+}
+
 export async function generateFlightPathSummary(
   weatherData: { [icao: string]: WeatherData },
   icaoOrder: string[],
@@ -71,28 +169,25 @@ export async function generateFlightPathSummary(
     }).join('\n\n');
 
     const prompt = `
-You are an aviation weather expert. Please analyze the following weather data for a flight path and provide a concise summary highlighting key weather conditions along the route.
-
 Flight Route: ${route[0]} → ${route[route.length - 1]}
-Airports along the path: ${icaoOrder.join(' → ')}
-
 Weather Data:
 ${weatherSummary}
 
-Please provide:
-1. Overall flight conditions summary
-2. Key weather concerns or favorable conditions
-3. Visibility and wind conditions along the route
-4. Any weather patterns that might affect the flight
-5. Recommendations for the pilot
+Provide a weather summary in EXACTLY 5 lines maximum. Format:
+1. ⚠️ HAZARDS: List dangerous conditions first (strong winds >20kt, low visibility <5SM, turbulence, icing, storms) - if none, write "None identified"
+2. 🌤️ CONDITIONS: Brief overall conditions summary
+3. 💨 WINDS: Notable wind conditions along route
+4. 👁️ VISIBILITY: Any visibility restrictions or concerns
+5. 📋 PILOT NOTE: One key recommendation
 
-Keep the summary concise but informative, focusing on practical aviation insights.
+Be concise. Highlight safety concerns first.
 `;
 
     // Get Gemini API key from environment variables
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
     if (!apiKey) {
-      throw new Error('Gemini API key not found. Please set VITE_GEMINI_API_KEY in your environment variables.');
+      console.warn('⚠️ Gemini API key not found. Falling back to basic summary.');
+      return generateBasicSummary(weatherData, icaoOrder, route, false);
     }
 
     // List available models for debugging (only on first call to avoid quota usage)
@@ -106,25 +201,30 @@ Keep the summary concise but informative, focusing on practical aviation insight
     lastRequestKey = requestKey;
     currentRequest = (async () => {
       try {
-// NEW - Correct Model Name
-const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent?key=${apiKey}`, {          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            contents: [{
-              parts: [{
-                text: prompt
-              }]
-            }],
-            generationConfig: {
-              temperature: 0.7,
-              topK: 1,
-              topP: 1,
-              maxOutputTokens: 1024,
-            }
-          })
-        });
+        // Prepare request body with increased token limit
+        const requestBody = {
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.7,
+            topK: 1,
+            topP: 1,
+            maxOutputTokens: 2048, // Increased from 1024 to handle longer responses
+          }
+        };
+
+        console.log('🚀 Request body:', JSON.stringify(requestBody, null, 2));
+
+        // Use correct Gemini model name (1.5-flash, not 2.5-flash)
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody)
+          }
+        );
+
+
 
         if (!response.ok) {
           const errorText = await response.text();
@@ -132,22 +232,128 @@ const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/m
           
           // Handle quota exceeded errors specifically
           if (response.status === 429) {
-            const errorData = JSON.parse(errorText);
-            const retryDelay = errorData.error?.details?.find((d: any) => d['@type']?.includes('RetryInfo'))?.retryDelay;
-            console.log(`🚫 Quota exceeded. ${retryDelay ? `Retry suggested in ${retryDelay}` : 'Rate limited'}`);
-            throw new Error(`Quota exceeded. Please wait a moment before trying again. ${retryDelay ? `Suggested retry time: ${retryDelay}` : ''}`);
+            try {
+              const errorData = JSON.parse(errorText);
+              const retryDelay = errorData.error?.details?.find((d: any) => d['@type']?.includes('RetryInfo'))?.retryDelay;
+              console.log(`🚫 Quota exceeded. ${retryDelay ? `Retry suggested in ${retryDelay}` : 'Rate limited'}`);
+              throw new Error(`Quota exceeded. Please wait a moment before trying again. ${retryDelay ? `Suggested retry time: ${retryDelay}` : ''}`);
+            } catch (parseError) {
+              console.error('Failed to parse error response:', parseError);
+              throw new Error('Quota exceeded. Please wait a moment before trying again.');
+            }
           }
           
           throw new Error(`Gemini API error: ${response.status} ${response.statusText}. Details: ${errorText}`);
         }
 
-        const data: GeminiResponse = await response.json();
+        let data: GeminiResponse;
+        try {
+          data = await response.json();
+        } catch (parseError) {
+          console.error('❌ Failed to parse JSON response:', parseError);
+          throw new Error('Invalid JSON response from Gemini API');
+        }
         
+        console.log('🔍 Gemini API Response Structure:', JSON.stringify(data, null, 2));
+        
+        // Check for API error in response body
+        if (data.error) {
+          console.error('❌ Gemini API Error in response:', data.error);
+          throw new Error(`Gemini API Error: ${data.error.message} (Code: ${data.error.code})`);
+        }
+        
+        // Enhanced validation of response structure
         if (!data.candidates || data.candidates.length === 0) {
+          console.error('❌ No candidates in response:', data);
           throw new Error('No response generated from Gemini API');
         }
 
-        return data.candidates[0].content.parts[0].text;
+        const candidate = data.candidates[0];
+        if (!candidate) {
+          console.error('❌ First candidate is null/undefined:', data.candidates);
+          throw new Error('Invalid response structure: candidate is null');
+        }
+        
+        console.log('🔍 Candidate structure:', JSON.stringify(candidate, null, 2));
+        
+        if (!candidate.content) {
+          console.error('❌ No content in candidate:', candidate);
+          throw new Error('Invalid response structure: missing content');
+        }
+
+        console.log('🔍 Content structure:', JSON.stringify(candidate.content, null, 2));
+
+        // Handle different possible response formats
+        let text: string;
+        
+        // Check if content has parts array (standard format)
+        if (candidate.content.parts && Array.isArray(candidate.content.parts) && candidate.content.parts.length > 0) {
+          const part = candidate.content.parts[0];
+          if (!part) {
+            console.error('❌ First part is null/undefined:', candidate.content.parts);
+            throw new Error('Invalid response structure: part is null');
+          }
+          
+          if (!part.text || typeof part.text !== 'string') {
+            console.error('❌ No text in part or text is not a string:', part);
+            throw new Error('Invalid response structure: missing or invalid text');
+          }
+          
+          text = part.text;
+          console.log('✅ Using text from parts array');
+        }
+        // Check if content has direct text property
+        else if (candidate.content.text && typeof candidate.content.text === 'string') {
+          console.log('✅ Using direct text from content');
+          text = candidate.content.text;
+        }
+        // Check if candidate has direct text property
+        else if ((candidate as any).text && typeof (candidate as any).text === 'string') {
+          console.log('✅ Using direct text from candidate');
+          text = (candidate as any).text;
+        }
+        // Check if there's a message property (some API versions use this)
+        else if ((candidate as any).message && typeof (candidate as any).message === 'string') {
+          console.log('✅ Using message from candidate');
+          text = (candidate as any).message;
+        }
+        // Special case: if content only has role but no text, check the finish reason
+        else if (candidate.content.role === 'model' && (!candidate.content.parts || candidate.content.parts.length === 0)) {
+          // Check if this is due to MAX_TOKENS
+          if ((candidate as any).finishReason === 'MAX_TOKENS') {
+            console.error('❌ API response truncated due to MAX_TOKENS limit');
+            throw new Error('API response was truncated due to token limit. Retrying with basic summary.');
+          } else {
+            console.error('❌ API returned empty response - content blocked or filtered');
+            throw new Error('API response was blocked or filtered. Please try with different content or check API safety settings.');
+          }
+        }
+        else {
+          console.error('❌ No valid text found in candidate. Available properties:', Object.keys(candidate));
+          console.error('❌ Content properties:', candidate.content ? Object.keys(candidate.content) : 'No content');
+          
+          // Try to extract any string value from the response as a last resort
+          const stringifyCandidate = JSON.stringify(candidate);
+          if (stringifyCandidate.includes('"text"')) {
+            console.log('🔍 Found text property in JSON, attempting extraction...');
+            try {
+              const textMatch = stringifyCandidate.match(/"text":\s*"([^"]+)"/);
+              if (textMatch && textMatch[1]) {
+                console.log('✅ Extracted text using regex fallback');
+                text = textMatch[1];
+              } else {
+                throw new Error('Could not extract text from response');
+              }
+            } catch (extractError) {
+              console.error('❌ Failed to extract text:', extractError);
+              throw new Error('Invalid response structure: no text content found in any expected format');
+            }
+          } else {
+            throw new Error('Invalid response structure: no text content found in any expected format');
+          }
+        }
+
+        return text;
       } finally {
         // Clear the current request when done
         if (currentRequest && lastRequestKey === requestKey) {
@@ -161,11 +367,27 @@ const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/m
   } catch (error) {
     console.error('Error generating flight path summary:', error);
     
+    // Log additional debug information for TypeError
+    if (error instanceof TypeError) {
+      console.error('🔴 TypeError details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+    }
+    
     // Check if it's a quota error
     const isQuotaError = error instanceof Error && error.message.includes('Quota exceeded');
     
+    // Check if it's a token limit error - try with a shorter prompt
+    const isTokenLimitError = error instanceof Error && error.message.includes('token limit');
+    if (isTokenLimitError && !lastRequestKey?.includes('short')) {
+      console.log('🔄 Retrying with shorter prompt due to token limit...');
+      return generateFlightPathSummaryShort(weatherData, icaoOrder, route);
+    }
+    
     // Fallback: Generate a basic summary without AI
-    console.log('Falling back to basic summary generation...');
+    console.log('🔄 Falling back to basic summary generation...');
     return generateBasicSummary(weatherData, icaoOrder, route, isQuotaError);
   }
 }

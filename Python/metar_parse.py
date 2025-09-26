@@ -169,7 +169,7 @@ def format_metar_plaintext(metar):
             output_lines.append("Cloud data not available")
     else:
         output_lines.append("Cloud data not available")
-
+    
     # Weather conditions
     weather_conditions = getattr(metar, 'weather_conditions', None)
     if weather_conditions and len(weather_conditions) > 0:

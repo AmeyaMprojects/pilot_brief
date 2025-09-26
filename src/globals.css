@@ -4,29 +4,46 @@
 
 @layer base {
   :root {
-    --background: 217 33% 10%; /* #0D1B2A - Primary Background */
-    --foreground: 210 40% 98%; /* #EAEAEA - Off-white text */
+    /* Liquid Glass Theme - Glassmorphism & Fluid Design */
+    --background: 220 20% 8%; /* Deep dark base for glass effects */
+    --foreground: 210 40% 98%; /* Crystal white text */
 
-    --card: 217 25% 18%; /* #1E2D3B - Card/Content Background */
-    --card-foreground: 210 40% 98%;
+    --card: 220 15% 12% / 0.1; /* Ultra-transparent glass cards */
+    --card-foreground: 210 40% 95%;
 
-    --popover: 217 25% 18%; /* Consistent with card background */
+    --popover: 220 15% 15% / 0.12;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 195 100% 45%; /* #00A8E8 - Primary Accent/Button Color (Modern Cyan) */
-    --primary-foreground: 222.2 47.4% 11.2%; /* Dark text on primary button for contrast */
+    --primary: 195 100% 55%; /* Bright cyan for glass highlights */
+    --primary-foreground: 220 20% 8%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 220 15% 18% / 0.08;
+    --secondary-foreground: 210 40% 90%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 220 15% 15% / 0.06;
+    --muted-foreground: 215 20% 70%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 280 100% 70%; /* Purple glass accent */
+    --accent-foreground: 220 20% 8%;
 
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 0 70% 55%;
     --destructive-foreground: 210 40% 98%;
+    
+    /* Glass effect variables */
+    --glass-bg: rgba(255, 255, 255, 0.05);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --glass-shadow: rgba(0, 0, 0, 0.3);
+    --glass-blur: 20px;
+    
+    /* Liquid motion variables */
+    --liquid-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --liquid-secondary: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    --liquid-accent: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    
+    /* Animation variables */
+    --animation-fast: 0.2s;
+    --animation-normal: 0.4s;
+    --animation-slow: 0.8s;
 
     --border: 217.2 32.6% 17.5%; /* Darker border for elements */
     --input: 217.2 32.6% 17.5%; /* Darker input background */
@@ -57,12 +74,187 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans; /* Apply sans-serif font */
+    @apply bg-background text-foreground font-sans;
+    background: radial-gradient(ellipse at top, #1e3a8a 0%, #0f172a 50%, #020617 100%);
+    background-attachment: fixed;
+    min-height: 100vh;
+    overflow-x: hidden;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    @apply text-white; /* Pure white for headers */
+    @apply text-white;
+    text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
   }
+}
+
+/* Liquid Glass Utility Classes */
+@layer components {
+  .glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 8px 32px var(--glass-shadow);
+  }
+  
+  .glass-card {
+    @apply glass rounded-2xl p-6;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .glass-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  }
+  
+  .glass-button {
+    @apply glass rounded-xl px-6 py-3 font-medium transition-all duration-300;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .glass-button:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+  }
+  
+  .glass-button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s;
+  }
+  
+  .glass-button:hover::before {
+    left: 100%;
+  }
+  
+  .glass-button-sm {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(8px);
+    border-radius: 50%;
+    padding: 0.25rem;
+    color: white;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .glass-button-sm:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.1);
+  }
+  
+  .glass-input {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+    backdrop-filter: blur(15px);
+    border-radius: 0.75rem;
+    transition: all 0.3s ease;
+  }
+  
+  .glass-input:focus-within {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(96, 165, 250, 0.5);
+    box-shadow: 0 8px 32px rgba(96, 165, 250, 0.2);
+  }
+  
+  .glass-tag {
+    background: linear-gradient(135deg, rgba(96, 165, 250, 0.3), rgba(147, 51, 234, 0.3));
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    border-radius: 9999px;
+    padding: 0.5rem 0.75rem;
+    display: flex;
+    align-items: center;
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+  
+  .glass-header {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+    border-bottom: 1px solid var(--glass-border);
+    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+  }
+  
+  .liquid-gradient {
+    background: var(--liquid-primary);
+    background-size: 200% 200%;
+    animation: liquidFlow 3s ease-in-out infinite;
+  }
+  
+  .liquid-gradient-secondary {
+    background: var(--liquid-secondary);
+    background-size: 200% 200%;
+    animation: liquidFlow 4s ease-in-out infinite;
+  }
+  
+  .liquid-gradient-accent {
+    background: var(--liquid-accent);
+    background-size: 200% 200%;
+    animation: liquidFlow 2s ease-in-out infinite;
+  }
+  
+
+  
+  .glass-input input {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: white;
+    width: 100%;
+  }
+  
+  .glass-input input::placeholder {
+    color: rgba(255, 255, 255, 0.6);
+  }
+}
+
+/* Animations */
+@keyframes liquidFlow {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes floating {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes glassShimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.shimmer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  animation: glassShimmer 2s infinite;
 }
 
 /* Add this to your src/index.css or main CSS file */

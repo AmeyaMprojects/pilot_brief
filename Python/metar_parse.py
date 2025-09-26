@@ -146,11 +146,12 @@ def format_metar_plaintext(metar):
                 if height is not None:
                     try:
                         if isinstance(height, (int, float)):
-                            height_str = f"{int(height*100)} feet"
+                            # Don't multiply - parser likely already provides correct values
+                            height_str = f"{int(height)} feet"
                         else:
                             # Try to convert string to number
                             height_num = float(str(height))
-                            height_str = f"{int(height_num*100)} feet"
+                            height_str = f"{int(height_num)} feet"
                     except (ValueError, TypeError):
                         height_str = "Unknown height"
                 else:
@@ -171,7 +172,7 @@ def format_metar_plaintext(metar):
 
     # Weather conditions
     weather_conditions = getattr(metar, 'weather_conditions', None)
-    if weather_conditions:
+    if weather_conditions and len(weather_conditions) > 0:
         weather_descs = []
         for w in weather_conditions:
             intensity = getattr(w, 'intensity', None)
@@ -191,9 +192,10 @@ def format_metar_plaintext(metar):
         if weather_descs:
             output_lines.append("Weather: " + ", ".join(weather_descs))
         else:
-            output_lines.append("Weather conditions not available")
+            output_lines.append("Weather: No significant weather")
     else:
-        output_lines.append("Weather conditions not available")
+        # No weather conditions means clear weather - this is normal and good!
+        output_lines.append("Weather: No significant weather")
 
     # Temperature and dew point
     temp = getattr(metar, 'temperature', None)

@@ -19,11 +19,31 @@ def get_metar_data(airport_id, format_type="raw"):
     }
     
     try:
-        r = requests.get(url=URL, params=PARAMS)
+        print(f"   🌐 Fetching from: {URL}?ids={airport_id}&format={format_type}")
+        r = requests.get(url=URL, params=PARAMS, timeout=10)
         r.raise_for_status()  # Raises an HTTPError for bad responses
-        return r.text
+        
+        response_text = r.text.strip()
+        print(f"   📡 Response length: {len(response_text)} characters")
+        
+        # Check if we got a valid response
+        if not response_text:
+            return f"Error fetching data: No data returned from aviationweather.gov for {airport_id}"
+        
+        # Log first 100 characters of response for debugging
+        preview = response_text[:100] + "..." if len(response_text) > 100 else response_text
+        print(f"   📄 Response preview: {preview}")
+        
+        return response_text
+        
+    except requests.exceptions.Timeout:
+        return f"Error fetching data: Request timeout for {airport_id}"
+    except requests.exceptions.ConnectionError:
+        return f"Error fetching data: Connection error - unable to reach aviationweather.gov for {airport_id}"
+    except requests.exceptions.HTTPError as e:
+        return f"Error fetching data: HTTP {e.response.status_code} error for {airport_id}"
     except requests.exceptions.RequestException as e:
-        return f"Error fetching data: {e}"
+        return f"Error fetching data: {e} for {airport_id}"
 
 # Example usage
 if __name__ == "__main__":

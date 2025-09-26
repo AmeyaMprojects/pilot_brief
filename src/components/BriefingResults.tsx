@@ -36,6 +36,7 @@ const BriefingResults: React.FC<BriefingResultsProps> = ({
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [showDetailedReports, setShowDetailedReports] = useState(false);
 
   // Helper function to format METAR data for better readability
   const formatMetar = (metar: string) => {
@@ -178,18 +179,30 @@ const BriefingResults: React.FC<BriefingResultsProps> = ({
                     </div>
                   </div>
                 )}
+                
+                {/* See Detailed Reports Button */}
+                <div className="flex justify-end mt-4">
+                  <button
+                    onClick={() => setShowDetailedReports(!showDetailedReports)}
+                    className="glass-button text-sm px-4 py-2 flex items-center gap-2 hover:bg-blue-400/20 transition-all duration-200"
+                  >
+                    <Eye className="w-4 h-4" />
+                    <span>{showDetailedReports ? 'Hide Detailed Reports' : 'See Detailed Reports'}</span>
+                  </button>
+                </div>
               </div>
 
               {/* Individual Weather Data */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 liquid-gradient rounded-full flex items-center justify-center">
-                    <Eye className="w-5 h-5 text-white" />
+              {showDetailedReports && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 liquid-gradient rounded-full flex items-center justify-center">
+                      <Eye className="w-5 h-5 text-white" />
+                    </div>
+                    <h3 className="text-xl font-bold bg-gradient-to-r from-blue-200 to-cyan-200 bg-clip-text text-transparent">
+                      Detailed Weather Reports
+                    </h3>
                   </div>
-                  <h3 className="text-xl font-bold bg-gradient-to-r from-blue-200 to-cyan-200 bg-clip-text text-transparent">
-                    Detailed Weather Reports
-                  </h3>
-                </div>
                 
                 {(icaoOrder || Object.keys(weatherData)).map((icao, index) => {
                   const weather = weatherData[icao];
@@ -257,7 +270,8 @@ const BriefingResults: React.FC<BriefingResultsProps> = ({
                     </div>
                   );
                 })}
-              </div>
+                </div>
+              )}
             </div>
           ) : (
             summary && (

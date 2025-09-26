@@ -34,15 +34,47 @@ const MapComponent = ({ selectedRoute = [], currentInput = '' }) => {
           mapInstanceRef.current = L.map(mapRef.current, {
             center: [39.8283, -98.5795],
             zoom: 4,
-            zoomControl: true,
+            zoomControl: false, // Remove zoom buttons
             scrollWheelZoom: true,
             dragging: true,
+            attributionControl: false, // Remove attribution control
           });
 
-          // Add OpenStreetMap tile layer (free)
-          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors',
-            maxZoom: 19,
+          // Define base layers
+          const baseLayers = {
+            "Satellite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+              attribution: '',
+              maxZoom: 19,
+            }),
+            "Street Map": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+              attribution: '',
+              maxZoom: 19,
+            }),
+            "Terrain": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Physical_Map/MapServer/tile/{z}/{y}/{x}', {
+              attribution: '',
+              maxZoom: 19,
+            })
+          };
+
+          // Define overlay layers
+          const overlayLayers = {
+            "Borders & Places": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+              attribution: '',
+              maxZoom: 19,
+              opacity: 0.8,
+            })
+          };
+
+          // Add default satellite layer
+          baseLayers["Satellite"].addTo(mapInstanceRef.current);
+          
+          // Add default borders overlay
+          overlayLayers["Borders & Places"].addTo(mapInstanceRef.current);
+
+          // Add layer control - collapsed by default (shows as icon)
+          L.control.layers(baseLayers, overlayLayers, {
+            position: 'topright',
+            collapsed: true // Show as icon, expands when clicked
           }).addTo(mapInstanceRef.current);
 
           console.log('✅ Map initialized successfully');

@@ -60,7 +60,7 @@ const Index: React.FC = () => {
       setBriefingStatus('loading');
       setBriefingError(null);
       
-      console.log('📊 Sending briefing request:', briefingData);
+      // console.log('📊 Sending briefing request:', briefingData);
       
       const response = await fetch('http://localhost:5000/api/generate-briefing', {
         method: 'POST',

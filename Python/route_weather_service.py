@@ -239,8 +239,8 @@ def calculate_distance_from_line(point_lat, point_lng, line_start_lat, line_star
         # Fallback: return minimum distance to either endpoint
         return min(d13, d23)
 
-def find_airports_along_route(start_point, end_point, max_distance_from_path=50):
-    """Find airports within 50 nautical miles of the flight path"""
+def find_airports_along_route(start_point, end_point, max_distance_from_path=50, max_airports=3):
+    """Find airports within 50 nautical miles of the flight path (limited to max_airports)"""
     
     airports_along_route = []
     
@@ -292,7 +292,13 @@ def find_airports_along_route(start_point, end_point, max_distance_from_path=50)
     # Sort by distance from start point
     airports_along_route.sort(key=lambda x: x['distance_to_start'])
     
-    return airports_along_route
+    # Limit to max_airports to prevent token issues
+    limited_airports = airports_along_route[:max_airports]
+    
+    if len(airports_along_route) > max_airports:
+        print(f"   ⚡ Limited to {max_airports} airports (found {len(airports_along_route)} total)")
+    
+    return limited_airports
 
 def generate_complete_route_with_intermediates(route_points):
     """Generate complete route including intermediate airports within 50 NM"""
@@ -308,8 +314,8 @@ def generate_complete_route_with_intermediates(route_points):
         
         print(f"🔍 Finding airports within 50 NM between {start_point['icao']} and {end_point['icao']}...")
         
-        # Find intermediate airports within 50 NM
-        intermediate_airports = find_airports_along_route(start_point, end_point, max_distance_from_path=50)
+        # Find intermediate airports within 50 NM (limited to 3 per segment)
+        intermediate_airports = find_airports_along_route(start_point, end_point, max_distance_from_path=50, max_airports=3)
         
         print(f"   Found {len(intermediate_airports)} airports within 50 NM of flight path")
         for airport in intermediate_airports:
@@ -320,6 +326,28 @@ def generate_complete_route_with_intermediates(route_points):
     
     # Add final destination
     complete_route.append(route_points[-1])
+    
+    # Global limit to prevent too many airports total
+    max_total_airports = 8  # Conservative limit for API processing
+    if len(complete_route) > max_total_airports:
+        print(f"⚡ Route has {len(complete_route)} airports, limiting to {max_total_airports} for API efficiency")
+        
+        # Keep departure and destination, select intermediate airports evenly
+        departure = complete_route[0]
+        destination = complete_route[-1]
+        intermediates = complete_route[1:-1]
+        
+        # Select evenly spaced intermediate airports
+        if len(intermediates) > (max_total_airports - 2):
+            step = len(intermediates) / (max_total_airports - 2)
+            selected_intermediates = []
+            for i in range(max_total_airports - 2):
+                index = int(i * step)
+                if index < len(intermediates):
+                    selected_intermediates.append(intermediates[index])
+            
+            complete_route = [departure] + selected_intermediates + [destination]
+            print(f"   Selected airports: {[airport['icao'] for airport in complete_route]}")
     
     return complete_route
 

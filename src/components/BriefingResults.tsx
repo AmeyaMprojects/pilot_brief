@@ -156,11 +156,11 @@ const BriefingResults: React.FC<BriefingResultsProps> = ({
                       <Eye className="w-5 h-5" />
                       Detailed Weather Reports
                     </h3>
-                    {(icaoOrder || Object.keys(weatherData)).map((icao) => {
+                    {(icaoOrder || Object.keys(weatherData)).map((icao, index) => {
                     const weather = weatherData[icao];
                     if (!weather) return null;
                     return (
-                    <div key={icao} className="border-l-4 border-blue-500 pl-4">
+                    <div key={`${icao}-${index}`} className="border-l-4 border-blue-500 pl-4">
                       <div className="flex items-center justify-between mb-2">
                         <h3 className="text-lg font-semibold text-blue-400">{icao}</h3>
                         <div className="flex items-center gap-2">

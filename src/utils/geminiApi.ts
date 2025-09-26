@@ -128,14 +128,114 @@ ${weatherSummary}
       throw new Error(`API error: ${response.status}`);
     }
 
-    const data = await response.json();
-    console.log('🔍 Short response:', JSON.stringify(data, null, 2));
-
-    if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
-      return data.candidates[0].content.parts[0].text;
+    let data: GeminiResponse;
+    try {
+      data = await response.json();
+    } catch (parseError) {
+      console.error('❌ Failed to parse JSON response in short prompt:', parseError);
+      throw new Error('Invalid JSON response from Gemini API');
     }
 
-    throw new Error('No valid response from short prompt');
+    console.log('🔍 Short response:', JSON.stringify(data, null, 2));
+
+    // Check for API error in response body
+    if (data.error) {
+      console.error('❌ Gemini API Error in short response:', data.error);
+      throw new Error(`Gemini API Error: ${data.error.message} (Code: ${data.error.code})`);
+    }
+
+    // Enhanced validation of response structure
+    if (!data.candidates || data.candidates.length === 0) {
+      console.error('❌ No candidates in short response:', data);
+      throw new Error('No response generated from Gemini API');
+    }
+
+    const candidate = data.candidates[0];
+    if (!candidate) {
+      console.error('❌ First candidate is null/undefined in short response:', data.candidates);
+      throw new Error('Invalid response structure: candidate is null');
+    }
+
+    console.log('🔍 Short candidate structure:', JSON.stringify(candidate, null, 2));
+
+    if (!candidate.content) {
+      console.error('❌ No content in short candidate:', candidate);
+      throw new Error('Invalid response structure: missing content');
+    }
+
+    console.log('🔍 Short content structure:', JSON.stringify(candidate.content, null, 2));
+
+    // Handle different possible response formats
+    let text: string;
+
+    // Check if content has parts array (standard format)
+    if (candidate.content.parts && Array.isArray(candidate.content.parts) && candidate.content.parts.length > 0) {
+      const part = candidate.content.parts[0];
+      if (!part) {
+        console.error('❌ First part is null/undefined in short response:', candidate.content.parts);
+        throw new Error('Invalid response structure: part is null');
+      }
+
+      if (!part.text || typeof part.text !== 'string') {
+        console.error('❌ No text in part or text is not a string in short response:', part);
+        throw new Error('Invalid response structure: missing or invalid text');
+      }
+
+      text = part.text;
+      console.log('✅ Using text from parts array in short response');
+    }
+    // Check if content has direct text property
+    else if (candidate.content.text && typeof candidate.content.text === 'string') {
+      console.log('✅ Using direct text from content in short response');
+      text = candidate.content.text;
+    }
+    // Check if candidate has direct text property
+    else if ((candidate as any).text && typeof (candidate as any).text === 'string') {
+      console.log('✅ Using direct text from candidate in short response');
+      text = (candidate as any).text;
+    }
+    // Check if there's a message property (some API versions use this)
+    else if ((candidate as any).message && typeof (candidate as any).message === 'string') {
+      console.log('✅ Using message from candidate in short response');
+      text = (candidate as any).message;
+    }
+    // Special case: if content only has role but no text, check the finish reason
+    else if (candidate.content.role === 'model' && (!candidate.content.parts || candidate.content.parts.length === 0)) {
+      // Check if this is due to MAX_TOKENS
+      if ((candidate as any).finishReason === 'MAX_TOKENS') {
+        console.error('❌ Short API response truncated due to MAX_TOKENS limit');
+        throw new Error('Short API response was truncated due to token limit.');
+      } else {
+        console.error('❌ Short API returned empty response - content blocked or filtered');
+        throw new Error('Short API response was blocked or filtered.');
+      }
+    }
+    else {
+      console.error('❌ No valid text found in short candidate. Available properties:', Object.keys(candidate));
+      console.error('❌ Short content properties:', candidate.content ? Object.keys(candidate.content) : 'No content');
+
+      // Try to extract any string value from the response as a last resort
+      const stringifyCandidate = JSON.stringify(candidate);
+      if (stringifyCandidate.includes('"text"')) {
+        console.log('🔍 Found text property in JSON, attempting extraction...');
+        try {
+          const textMatch = stringifyCandidate.match(/"text":\s*"([^"]+)"/);
+          if (textMatch && textMatch[1]) {
+            console.log('✅ Extracted text using regex fallback in short response');
+            text = textMatch[1];
+          } else {
+            throw new Error('Could not extract text from short response');
+          }
+        } catch (extractError) {
+          console.error('❌ Failed to extract text from short response:', extractError);
+          throw new Error('Invalid response structure: no text content found in any expected format');
+        }
+      } else {
+        throw new Error('Invalid response structure: no text content found in any expected format');
+      }
+    }
+
+    return text;
   } catch (error) {
     console.error('Short prompt also failed:', error);
     return generateBasicSummary(weatherData, icaoOrder, route, false);

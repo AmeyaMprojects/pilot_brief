@@ -1,0 +1,13 @@
+# Aviation Weather Service Dependencies
+# Core web framework
+flask>=2.3.0
+flask-cors>=4.0.0
+
+# HTTP requests for weather data
+requests>=2.31.0
+
+# METAR/TAF parsing library
+metar-taf-parser>=1.2.0
+
+# Standard library modules (included with Python)
+# datetime, json, math, os, sys, re - no installation needed

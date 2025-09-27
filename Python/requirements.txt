@@ -7,7 +7,7 @@ flask-cors>=4.0.0
 requests>=2.31.0
 
 # METAR/TAF parsing library
-metar-taf-parser>=1.2.0
+metar-taf-parser-mivek>=1.2.0
 
 # Standard library modules (included with Python)
 # datetime, json, math, os, sys, re - no installation needed
